@@ -1,0 +1,119 @@
+CENAFE_04325  00545
+CENAFE_02785 __. 02900
+CENAFE_04930  12450
+
+
+import bpy
+import blf
+from bpy_extras.view3d_utils import location_3d_to_region_2d
+
+handler = None
+landmark_to_gene = {
+    "Eyelid_Creases_2": "CENAFE_08270",
+    "Cheek_Line_4": "CENAFE_05530",
+    "Brow_Bent": "CENAFE_00750",
+    "Chin_Jowls_3": "CENAFE_02785",
+    "Shiba_Brows": "CENAFE_04930",
+    "Crown_Side_Most": "CENAFE_04325",
+    "Eye_Edge": "CENAFE_15370",
+    "Mid_Cheeks": "CENAFE_02885",
+    "Cheek_Line1": "CENAFE_15030",
+    "Cheek_Line3": "CENAFE_17400",
+    "Middle_Forehead": "CENAFE_11050",
+    "Lower_Cheek_Line_2": "CENAFE_16895",
+    "Eyeglass_rests": "CENAFE_04045",
+    "Under_Lip_1": "CENAFE_09865",
+    "Nose_Obliques_Higher": "CENAFE_05275",
+    "Under_Lip_2": "CENAFE_05545",
+    "Lower_Cheek_Line_4": "CENAFE_16510",
+    "Lower_Cheek_Line_5": "CENAFE_06150",
+    "Bottom_Eyelid_Creases_3": "CENAFE_07810",
+    "Chin_Jowls_1": "CENAFE_05515",
+    "Eyelid_Creases": "CENAFE_07870",
+    "Eyelid_Creases_4": "CENAFE_03360",
+    "Nostril_Indents": "CENAFE_04420",
+    "Cheek_Line2": "CENAFE_16725",
+    "Under_Lip_3": "CENAFE_03250",
+    "Forehead_Sides": "CENAFE_12450",
+    "Head_Sides": "CENAFE_04200",
+    "Chin": "CENAFE_04755",
+    "Under_Lip_4": "CENAFE_09230",
+    "Crown_Sides": "CENAFE_00395",
+    "Middle_Lower_Lip": "CENAFE_14100",
+    "Lower_Cheek_Line": "CENAFE_11460",
+    "Middle_Head": "CENAFE_04950",
+    "Eyelid_Creases_3": "CENAFE_09625",
+    "Chin_Jowls_2": "CENAFE_14330",
+    "Nose_Obliques_1": "CENAFE_02900",
+    "Third_Eye": "CENAFE_03495",
+    "Eyelid_Crease_0": "CENAFE_05685",
+    "Nose_Obliques": "CENAFE_13865",
+    "Mouth_Corners_2": "CENAFE_13975",
+    "Bottom_Eyelid_Creases_1": "CENAFE_16320",
+    "Mouth_Corners": "CENAFE_01530",
+    "Nose_Obliques_2": "CENAFE_03660",
+    "Bottom_Eyelid_Creases_2": "CENAFE_04540",
+    "Nose_Crease": "CENAFE_06905",
+    "Mouth_Highlights": "CENAFE_03815",
+    "Bottom_Eyelid_Creases_4": "CENAFE_12320",
+    "Lips_Top": "CENAFE_11045",
+    "Nose_bridge": "CENAFE_11855",
+    "Final_Group": "CENAFE_10455",
+    'eyes_open_mask': ''
+}
+
+def draw_callback(self, context):
+    global landmark_to_gene
+    font_id = 0  # default font
+    blf.size(font_id, 14)  # size only takes 2 arguments now
+
+    region = context.region
+    rv3d = context.space_data.region_3d
+
+    for obj in context.visible_objects:
+        if context.mode != 'OBJECT':
+            continue
+        coord = location_3d_to_region_2d(region, rv3d, obj.location)
+        if coord:
+#            blf.position(font_id, coord.x, coord.y, 0)
+            cleaned_name = obj.name.replace('Marker_', '').replace('.001','').replace('.002','')
+            gene = landmark_to_gene[cleaned_name]
+            offset_x = 10 if ".001" in obj.name else -100  # adjust values to your liking
+            blf.position(font_id, coord.x + offset_x, coord.y, 0)
+            
+            if 'Eye_Edge' in obj.name:
+                gene = 'CENAFE_15370'
+            if 'Middle_Head' in obj.name:
+                gene = 'CENAFE_04950'
+            if 'Final_Group' in obj.name:
+                gene = 'CENAFE_10455'
+            if 'Mouth_Highlights' in obj.name:
+                gene = 'CENAFE_03815'
+            if 'Mouth_Corners' in obj.name:
+                gene = 'CENAFE_01530'
+            if 'Mouth_Corners_2' in obj.name:
+                gene = 'CENAFE_13975'
+                
+
+#            blf.draw(font_id, gene)
+            print(gene)
+            blf.draw(font_id, gene)
+
+def register_draw_handler():
+    global handler
+    if handler is None:
+        handler = bpy.types.SpaceView3D.draw_handler_add(draw_callback, (None, bpy.context), 'WINDOW', 'POST_PIXEL')
+        print("✅ Name overlay handler added.")
+
+def unregister_draw_handler():
+    global handler
+    if handler is not None:
+        bpy.types.SpaceView3D.draw_handler_remove(handler, 'WINDOW')
+        handler = None
+        print("❌ Name overlay handler removed.")
+
+# Run this to start
+register_draw_handler()
+
+# To stop it later, run:
+#unregister_draw_handler()

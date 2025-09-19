@@ -1,0 +1,21 @@
+First find your Blender python executable: 
+
+Go to your Blender’s scripting tab and run:
+    import sys
+    print(sys.executable)
+
+For me it's:
+/Applications/Blender.app/Contents/Resources/4.4/python/bin/python3.11
+
+Install scipy:
+/Applications/Blender.app/Contents/Resources/4.4/python/bin/python3.11 -m pip install scipy
+
+
+What are teh important files?
+
+algo_evolution.ipynb
+water_trapping.py
+blender_rbf_script.py
+
+
+/Applications/Blender.app/Contents/MacOS/Blender 
