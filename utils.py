@@ -6,7 +6,8 @@ import ast
 import json
 import tempfile
 import numpy as np 
-def merge_close_genes(original_positions, dithered_positions, threshold=10):
+
+def merge_close_genes(original_positions, dithered_positions, threshold=6.8):
     original_positions = [np.array(pos) for pos in original_positions]
     dithered_positions = [np.array(pos) for pos in dithered_positions]
     changed = True

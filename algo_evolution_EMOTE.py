@@ -19,21 +19,24 @@ ANALYSIS_SCRIPT_PATH = 'face_emote.py'
 BASE_INPUT_BLEND_FILE = 'eyes_open_landmark_EMOTE.blend'
 OBJECT_NAME_TO_ANALYZE = "eyes_open_mask"
 
-POPULATION_SIZE = 4
+POPULATION_SIZE = 7
 N_GENERATIONS = 3
 TOP_PARENTS_TOTAL = 4  # Top 25 of parents for breeding
 
 # These are the params for the dithering...
-NUM_POINTS_TO_DITHER = [10, 15, 20, 30]
-MIN_DITHER = 1.5
-MAX_DITHER = 6.5
+NUM_POINTS_TO_DITHER = [10, 20, 30, 100]
+MIN_DITHER = [1.5, 0.5, 0.0, 0.0]
+MAX_DITHER = [8.5, 5, 7, 10]
+
+STARTING_GEN = 0
+ENDING_GEN = 5
 
 # --- Temporary Directory for EA files ---
-TEMP_DIR = "INDIVIDUALS_EVOLVING_EMOTE_5" # Changed by user
-if os.path.exists(TEMP_DIR):
-    shutil.rmtree(TEMP_DIR)
-os.makedirs(TEMP_DIR, exist_ok=True)
-
+TEMP_DIR = "INDIVIDUALS_EVOLVING_EMOTE_6" # Changed by user
+# if os.path.exists(TEMP_DIR):
+#     shutil.rmtree(TEMP_DIR)
+if not os.path.exists(TEMP_DIR):
+    os.makedirs(TEMP_DIR, exist_ok=True)
 
 import hashlib
 
@@ -112,14 +115,19 @@ def evaluate_and_log_individual(
                 log_entry["analysis_status"] = "failed_no_results"
         else:
             log_entry["analysis_status"] = "success"
-            # key_emotion = random.choice(['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise'])
-            # log_entry['emotion_key'] = key_emotion
             # NOTE: no neutral...
-            emotions = [(emote, analysis_results[emote]) for emote in ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise']]
-            max_emotion = max(emotions, key=lambda x: x[1])
+            emotional_cast = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise']
+            emotions = [(emote, analysis_results[emote]) for emote in emotional_cast]
+            # Subtract out the neutral-ness of the face...
+            max_emotion = max(emotions, key=lambda x: x[1]) 
             log_entry['emotion_key'] = max_emotion[0]
             log_entry.update(analysis_results)
-            current_fitness = max_emotion[1]
+            other_emotions = sum([analysis_results[emote] for emote in emotional_cast if max_emotion[0] != emote])
+            current_fitness = max_emotion[1] - other_emotions - ((3 * analysis_results['neutral']))
+            print('top emotion rating:', max_emotion[1],  ' other_emotions:', other_emotions, ' neutral:', ((3 * analysis_results['neutral'])))
+            print('current_fitness:', current_fitness)
+
+            
 
     log_entry['fitness'] = current_fitness
 
@@ -128,6 +136,41 @@ def evaluate_and_log_individual(
     csv_file_handle.flush()
     
     return log_entry
+
+def convert_row(row: dict) -> dict:
+    converted = {}
+    for key, val in row.items():
+        if val is None:
+            converted[key] = None
+            continue
+
+        # Try JSON decoding first (for things like lists)
+        try:
+            parsed = json.loads(val)
+            converted[key] = parsed
+            continue
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        # Try integer
+        try:
+            converted[key] = int(val)
+            continue
+        except ValueError:
+            pass
+
+        # Try float
+        try:
+            converted[key] = float(val)
+            continue
+        except ValueError:
+            pass
+
+        # Leave as string if nothing else worked
+        converted[key] = val
+
+    return converted
+
 
 def get_top_parents(all_individuals_detailed_log_in_memory, current_gen, total):
     successful_individuals = []
@@ -138,7 +181,6 @@ def get_top_parents(all_individuals_detailed_log_in_memory, current_gen, total):
 
     # Sort by fitness (descending for maximization)
     successful_individuals.sort(key=lambda x: x['fitness'], reverse=True)
-    
     # Return the top total parents
     num_top_parents = max(2, total)  # At least 2 parents
     return successful_individuals[:num_top_parents]
@@ -159,51 +201,70 @@ def main():
         "generation_status", "analysis_status", "genes",
     ]
 
+    # with open(detailed_log_csv_path, 'a+', newline='') as csvfile_handle:
+    #     csv_writer = csv.DictWriter(csvfile_handle, fieldnames=csv_fieldnames)
+    #     csvfile_handle.seek(0)
+    #     is_empty = not csvfile_handle.read(1)
+    #     if is_empty:
+    #         csvfile_handle.seek(0)
+    #         csv_writer.writeheader()
     with open(detailed_log_csv_path, 'a+', newline='') as csvfile_handle:
         csv_writer = csv.DictWriter(csvfile_handle, fieldnames=csv_fieldnames)
+
+        # Check if file is empty
         csvfile_handle.seek(0)
         is_empty = not csvfile_handle.read(1)
+
         if is_empty:
             csvfile_handle.seek(0)
             csv_writer.writeheader()
+        else:
+            # Read entire CSV into dict
+            csvfile_handle.seek(0)
+            csv_reader = csv.DictReader(csvfile_handle)
+            for row in csv_reader:
+                all_individuals_detailed_log_in_memory.append(convert_row(row))
 
         # Generation 0
         print("Evaluating initial population (Generation 0)...")
-        for i in tqdm(range(POPULATION_SIZE)): # ind is a list of genes
-            # print('whats ind? ', ind)
-            print(f"  Gen 0, Eval Ind {i+1}/{POPULATION_SIZE}")
-            individual_genes = get_dithered_vertices(
-                input=BASE_INPUT_BLEND_FILE,
-                num_points_to_dither=NUM_POINTS_TO_DITHER[0],
-                min_dither=MIN_DITHER,
-                max_dither=MAX_DITHER,
-                exempt_vertices=[] # nothing here yet since its the base run
-            )
-            original_positions, dithered_positions = [], []
-            for orig_position, dith_position in individual_genes:
-                original_positions.append(orig_position)
-                dithered_positions.append(dith_position)
+        if 0 == STARTING_GEN:
+            for i in tqdm(range(POPULATION_SIZE)): # ind is a list of genes
+                # print('whats ind? ', ind)
+                print(f"  Gen 0, Eval Ind {i+1}/{POPULATION_SIZE}")
+                individual_genes = get_dithered_vertices(
+                    input=BASE_INPUT_BLEND_FILE,
+                    num_points_to_dither=NUM_POINTS_TO_DITHER[0],
+                    min_dither=MIN_DITHER[0],
+                    max_dither=MAX_DITHER[0],
+                    exempt_vertices=[] # nothing here yet since its the base run
+                )
+                original_positions, dithered_positions = [], []
+                for orig_position, dith_position in individual_genes:
+                    original_positions.append(orig_position)
+                    dithered_positions.append(dith_position)
 
-            merged_orig, merged_dith = merge_close_genes(original_positions, dithered_positions)
-            print(
-                'merging cut: ', 
-                len(original_positions) - len(merged_orig), 
-                ' original and cut: ',
-                len(dithered_positions) - len(merged_dith), 
-            )
-            individual_genes = [[o, d] for o, d in zip(merged_orig, merged_dith)]
-            log_entry = evaluate_and_log_individual(
-                individual_genes=individual_genes, current_generation_num=0,
-                parent1_individual_id_for_log="INITIAL",
-                parent2_individual_id_for_log="INITIAL",
-                csv_writer_object=csv_writer, csv_file_handle=csvfile_handle
-            )
-            all_individuals_detailed_log_in_memory.append(log_entry)
-            print('fitness value: ', log_entry['fitness'], ' for ', log_entry['emotion_key'])
-        # Figure out what to do with the updated_genes
+                merged_orig, merged_dith = merge_close_genes(original_positions, dithered_positions)
+                print(
+                    'merging cut: ', 
+                    len(original_positions) - len(merged_orig), 
+                    ' original and cut: ',
+                    len(dithered_positions) - len(merged_dith), 
+                )
+                individual_genes = [[o, d] for o, d in zip(merged_orig, merged_dith)]
+                log_entry = evaluate_and_log_individual(
+                    individual_genes=individual_genes, current_generation_num=0,
+                    parent1_individual_id_for_log="INITIAL",
+                    parent2_individual_id_for_log="INITIAL",
+                    csv_writer_object=csv_writer, csv_file_handle=csvfile_handle
+                )
+                all_individuals_detailed_log_in_memory.append(log_entry)
+                print('fitness value: ', log_entry['fitness'], ' for ', log_entry['emotion_key'])
         
         # Subsequent Generations
         for gen in range(1, N_GENERATIONS + 1):
+            if gen < STARTING_GEN or gen >= ENDING_GEN:
+                continue
+
             print(f"\n--- Generation {gen}/{N_GENERATIONS} ---")
             
             # Get top parents from previous generation
@@ -218,8 +279,8 @@ def main():
                 new_mutations = get_dithered_vertices(
                     input=BASE_INPUT_BLEND_FILE,
                     num_points_to_dither=NUM_POINTS_TO_DITHER[gen],
-                    min_dither=MIN_DITHER,
-                    max_dither=MAX_DITHER,
+                    min_dither=MIN_DITHER[gen],
+                    max_dither=MAX_DITHER[gen],
                     exempt_vertices=[gene[0] for gene in child_genes]
                 )
                 child_genes = child_genes + new_mutations
