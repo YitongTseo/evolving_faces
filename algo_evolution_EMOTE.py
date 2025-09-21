@@ -12,6 +12,8 @@ from randomly_dither_points_helper import get_dithered_vertices
 import pandas as pd
 from tqdm import tqdm
 
+# 28413638, 5f80888c, 32159b42, d9346748, df1aaea1, 656029da, 5a44c7da, a01b13cd, a33c6fe5
+
 # --- Configuration ---
 BLENDER_EXECUTABLE_PATH = '/Applications/Blender.app/Contents/MacOS/Blender'
 GENERATION_HELPER_SCRIPT_PATH = 'rando_blender_rbf_script.py'
@@ -19,9 +21,9 @@ ANALYSIS_SCRIPT_PATH = 'face_emote.py'
 BASE_INPUT_BLEND_FILE = 'eyes_open_landmark_EMOTE.blend'
 OBJECT_NAME_TO_ANALYZE = "eyes_open_mask"
 
-POPULATION_SIZE = 7
+POPULATION_SIZE = 2000
 N_GENERATIONS = 3
-TOP_PARENTS_TOTAL = 4  # Top 25 of parents for breeding
+TOP_PARENTS_TOTAL = 8  # Top 25 of parents for breeding
 
 # These are the params for the dithering...
 NUM_POINTS_TO_DITHER = [10, 20, 30, 100]
@@ -29,10 +31,10 @@ MIN_DITHER = [1.5, 0.5, 0.0, 0.0]
 MAX_DITHER = [8.5, 5, 7, 10]
 
 STARTING_GEN = 0
-ENDING_GEN = 5
+ENDING_GEN = 1
 
 # --- Temporary Directory for EA files ---
-TEMP_DIR = "INDIVIDUALS_EVOLVING_EMOTE_6" # Changed by user
+TEMP_DIR = "INDIVIDUALS_EVOLVING_EMOTE_BIG_RUYN" # Changed by user
 # if os.path.exists(TEMP_DIR):
 #     shutil.rmtree(TEMP_DIR)
 if not os.path.exists(TEMP_DIR):
@@ -110,13 +112,16 @@ def evaluate_and_log_individual(
             print(f"  Exception during run_blender_analysis for {individual_id}: {e}")
             log_entry["analysis_status"] = f"error: {e}"
         
+        # deleting the blender file to save space... I think this is OK since we can just recreate it from the genes...
+        os.remove(generated_blend_path)
+        
         if analysis_results is None:
             if log_entry["analysis_status"] == "pending":
                 log_entry["analysis_status"] = "failed_no_results"
         else:
             log_entry["analysis_status"] = "success"
             # NOTE: no neutral...
-            emotional_cast = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise']
+            emotional_cast = ['angry', 'disgust', 'fear', 'happy', 'sad'] # NO surprise... 'surprise'
             emotions = [(emote, analysis_results[emote]) for emote in emotional_cast]
             # Subtract out the neutral-ness of the face...
             max_emotion = max(emotions, key=lambda x: x[1]) 
