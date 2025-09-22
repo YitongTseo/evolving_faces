@@ -12,7 +12,6 @@ from randomly_dither_points_helper import get_dithered_vertices
 import pandas as pd
 from tqdm import tqdm
 
-# 28413638, 5f80888c, 32159b42, d9346748, df1aaea1, 656029da, 5a44c7da, a01b13cd, a33c6fe5
 
 # --- Configuration ---
 BLENDER_EXECUTABLE_PATH = '/Applications/Blender.app/Contents/MacOS/Blender'
@@ -23,15 +22,22 @@ OBJECT_NAME_TO_ANALYZE = "eyes_open_mask"
 
 POPULATION_SIZE = 2000
 N_GENERATIONS = 3
-TOP_PARENTS_TOTAL = 8  # Top 25 of parents for breeding
+TOP_PARENTS_TOTAL = 12  # Top 25 of parents for breeding
+GEN0_FACES = ['284136g8', '32159b42', 'd9346748', 'df1aaea1', '656029da', '5a44c7da', 'a01b13cd', 'a33c6fe5','7a5d46ab']
+GEN1_FACES = [
+    '71157398',  'f94ec936', '8ebe8b02',
+    'ab83bbf7',   '4a2e5720', 'adfd099e', 
+    '9576e2df',  '1b81e25d',  'e54cbcce',
+    '6e8de1d9', 'e52b237e', 'd53a9a9c',  
+]
 
 # These are the params for the dithering...
 NUM_POINTS_TO_DITHER = [10, 20, 30, 100]
 MIN_DITHER = [1.5, 0.5, 0.0, 0.0]
 MAX_DITHER = [8.5, 5, 7, 10]
 
-STARTING_GEN = 0
-ENDING_GEN = 1
+STARTING_GEN = 2
+ENDING_GEN = 3
 
 # --- Temporary Directory for EA files ---
 TEMP_DIR = "INDIVIDUALS_EVOLVING_EMOTE_BIG_RUYN" # Changed by user
@@ -121,13 +127,14 @@ def evaluate_and_log_individual(
         else:
             log_entry["analysis_status"] = "success"
             # NOTE: no neutral...
-            emotional_cast = ['angry', 'disgust', 'fear', 'happy', 'sad'] # NO surprise... 'surprise'
+            full_emotional_cast= ['angry', 'disgust', 'fear',  'sad', 'happy', 'surprise']
+            emotional_cast = ['angry', 'disgust', 'fear',  'sad'] # NO surprise or happy... 'surprise', 'happy',
             emotions = [(emote, analysis_results[emote]) for emote in emotional_cast]
             # Subtract out the neutral-ness of the face...
             max_emotion = max(emotions, key=lambda x: x[1]) 
             log_entry['emotion_key'] = max_emotion[0]
             log_entry.update(analysis_results)
-            other_emotions = sum([analysis_results[emote] for emote in emotional_cast if max_emotion[0] != emote])
+            other_emotions = sum([analysis_results[emote] for emote in full_emotional_cast if max_emotion[0] != emote])
             current_fitness = max_emotion[1] - other_emotions - ((3 * analysis_results['neutral']))
             print('top emotion rating:', max_emotion[1],  ' other_emotions:', other_emotions, ' neutral:', ((3 * analysis_results['neutral'])))
             print('current_fitness:', current_fitness)
@@ -229,6 +236,8 @@ def main():
             csv_reader = csv.DictReader(csvfile_handle)
             for row in csv_reader:
                 all_individuals_detailed_log_in_memory.append(convert_row(row))
+        all_individuals_detailed_log_in_memory = [ind for ind in all_individuals_detailed_log_in_memory if ((ind['generation'] != 0) or (ind['individual_id'] in GEN0_FACES))]
+        all_individuals_detailed_log_in_memory = [ind for ind in all_individuals_detailed_log_in_memory if ((ind['generation'] != 1) or (ind['individual_id'] in GEN1_FACES))]
 
         # Generation 0
         print("Evaluating initial population (Generation 0)...")
